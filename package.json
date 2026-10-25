@@ -1,0 +1,10 @@
+{
+  "name": "meal-rotation-planner",
+  "version": "1.0.0",
+  "description": "Offline, local-first meal rotation planner: pantry list, rotating meal deck, auto shopping list, leftover reminders, and too-tired backups. Zero dependencies.",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "license": "MIT"
+}

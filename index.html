@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Meal Rotation Kitchen: an offline, low-energy meal planner with a rotating deck, pantry list, auto shopping list, leftover reminders, and too-tired backups.">
+  <title>Meal Rotation Kitchen</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8D%B2%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="site-header">
+    <div>
+      <h1>Meal Rotation Kitchen 🍲</h1>
+      <p class="tagline">Low-energy cooking, on rails. Everything stays on this device.</p>
+    </div>
+    <div class="header-actions">
+      <button id="btn-export" class="btn btn-ghost" type="button">Export</button>
+      <button id="btn-import" class="btn btn-ghost" type="button">Import</button>
+      <button id="btn-reset" class="btn btn-ghost" type="button">Reset to starters</button>
+      <button id="btn-new-meal" class="btn btn-primary" type="button">+ New meal</button>
+      <input type="file" id="import-file" accept="application/json" hidden>
+    </div>
+  </header>
+
+  <main>
+    <!-- Today -->
+    <section class="card today-card" aria-labelledby="today-heading">
+      <h2 id="today-heading">Today</h2>
+      <div class="today-grid">
+        <div id="pick-zone" class="dropzone" aria-label="Today's pick dropzone">
+          <div id="pick-empty" class="dropzone-empty">
+            <p><strong>Drag a meal here</strong> (or press “Pick” on any card)</p>
+            <p id="suggest-line" class="muted"></p>
+          </div>
+          <div id="pick-card" class="pick-card" hidden>
+            <div class="pick-top">
+              <span id="pick-effort" class="chip chip-effort"></span>
+              <span id="pick-servings" class="muted"></span>
+            </div>
+            <h3 id="pick-name"></h3>
+            <p id="pick-notes" class="muted"></p>
+            <div class="pick-actions">
+              <button id="btn-cook" class="btn btn-primary" type="button">✅ Cooked it (move to back of deck)</button>
+              <button id="btn-clear-pick" class="btn btn-ghost" type="button">Clear pick</button>
+            </div>
+          </div>
+        </div>
+        <div class="leftover-panel">
+          <h3>Leftover reminders</h3>
+          <div id="leftover-chips" class="chip-row"></div>
+          <form id="form-leftover" class="leftover-form">
+            <input id="leftover-name" type="text" placeholder="e.g. Rice from Tuesday" maxlength="60" required>
+            <label>Good for <input id="leftover-days" type="number" min="1" max="14" value="3" inputmode="numeric"> days</label>
+            <button class="btn btn-ghost" type="submit">Add chip</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- Meal deck -->
+    <section class="card" aria-labelledby="deck-heading">
+      <div class="section-head">
+        <h2 id="deck-heading">Meal deck</h2>
+        <p class="muted">Cooking a meal moves it to the back of the deck — nothing repeats until everything has had a turn. Drag cards to reorder; check “Add to list” to put its recipe on the shopping list.</p>
+      </div>
+      <div id="meal-grid" class="meal-grid"></div>
+    </section>
+
+    <!-- Shopping list -->
+    <section class="card" aria-labelledby="list-heading">
+      <div class="section-head">
+        <h2 id="list-heading">Shopping list</h2>
+        <p class="muted">Built from every meal checked “Add to list”, plus today’s pick automatically. Ingredients from multiple meals merge, and pantry stock is subtracted.</p>
+      </div>
+      <div id="shopping-list" class="shopping-list"></div>
+    </section>
+
+    <!-- Pantry -->
+    <section class="card" aria-labelledby="pantry-heading">
+      <h2 id="pantry-heading">Pantry</h2>
+      <p class="muted">What you already have. Matching name + unit (“2 cup”) is subtracted from the shopping list.</p>
+      <form id="form-pantry" class="pantry-form">
+        <input id="pantry-name" type="text" placeholder="Item (e.g. rice)" maxlength="60" required>
+        <input id="pantry-qty" type="number" min="0" step="any" placeholder="Qty" inputmode="decimal">
+        <input id="pantry-unit" list="unit-options" type="text" placeholder="Unit (cup, lb, can…)" maxlength="20">
+        <select id="pantry-aisle">
+          <option>Produce</option><option>Meat</option><option>Dairy</option>
+          <option>Pantry</option><option>Frozen</option><option>Bakery</option><option>Other</option>
+        </select>
+        <button class="btn btn-primary" type="submit">Add to pantry</button>
+      </form>
+      <div id="pantry-list" class="pantry-list"></div>
+    </section>
+
+    <!-- Too-tired backups -->
+    <section class="card" aria-labelledby="backup-heading">
+      <h2 id="backup-heading">Too-tired backups</h2>
+      <p class="muted">For nights when the deck is too much. These never rotate — grab one and be gentle with yourself.</p>
+      <div id="backup-row" class="backup-row"></div>
+    </section>
+  </main>
+
+  <!-- Meal editor dialog -->
+  <dialog id="meal-dialog">
+    <form id="form-meal" method="dialog" class="meal-editor">
+      <h2 id="meal-dialog-title">New meal</h2>
+      <div class="editor-grid">
+        <label>Name
+          <input id="meal-name" type="text" maxlength="80" placeholder="e.g. Sheet-pan chicken and rice" required>
+        </label>
+        <div class="editor-row">
+          <label>Servings
+            <input id="meal-servings" type="number" min="1" step="1" value="4" inputmode="numeric">
+          </label>
+          <label>Effort
+            <select id="meal-effort">
+              <option value="easy">easy</option>
+              <option value="medium">medium</option>
+            </select>
+          </label>
+          <label class="check-label">
+            <input id="meal-backup" type="checkbox"> Too-tired backup
+          </label>
+          <label class="check-label">
+            <input id="meal-inplan" type="checkbox"> Add to list
+          </label>
+        </div>
+        <label class="wide">Notes (how you actually cook it)
+          <textarea id="meal-notes" rows="2" maxlength="400" placeholder="One line is enough."></textarea>
+        </label>
+
+        <fieldset class="wide">
+          <legend>Recipe — ingredients (blank qty rows are ignored)</legend>
+          <table id="ing-table">
+            <thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Aisle</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <button id="btn-add-ing" class="btn btn-ghost" type="button">+ ingredient</button>
+        </fieldset>
+
+        <fieldset class="wide">
+          <legend>Leftovers (chips appear after you cook this)</legend>
+          <table id="lo-table">
+            <thead><tr><th>Remind me about</th><th>Good for (days)</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <button id="btn-add-lo" class="btn btn-ghost" type="button">+ leftover</button>
+        </fieldset>
+      </div>
+      <!-- prevent dialog default submit; JS handles each button action -->
+      <div class="editor-actions">
+        <button id="btn-meal-delete" class="btn btn-danger" type="button" hidden>Delete meal</button>
+        <button id="btn-meal-cancel" class="btn btn-ghost" type="button" value="cancel">Cancel</button>
+        <button id="btn-meal-save" class="btn btn-primary" type="button">Save meal</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+
+  <footer class="site-footer">
+    <p>Meal Rotation Kitchen — offline and local-first. Data lives only in your browser (localStorage).
+    <a href="https://dylanasdale.github.io" target="_blank" rel="noopener">Made in the spirit of “explain it like a friend would.”</a>
+    © 2026 Asdale Dynamics, LLC. MIT licensed.</p>
+  </footer>
+
+  <datalist id="unit-options">
+    <option value=""></option><option value="cup"></option><option value="tbsp"></option>
+    <option value="tsp"></option><option value="oz"></option><option value="lb"></option>
+    <option value="can"></option><option value="bag"></option><option value="box"></option>
+    <option value="jar"></option><option value="clove"></option><option value="slice"></option>
+    <option value="pack"></option><option value="pint"></option><option value="bunch"></option>
+  </datalist>
+
+  <script src="js/logic.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
